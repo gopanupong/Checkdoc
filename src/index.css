@@ -1,0 +1,45 @@
+@import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&family=Sarabun:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Prompt", "Sarabun", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  
+  /* Custom PEA (Provincial Electricity Authority) Purple and Accent Palette */
+  --color-pea-purple-50: #f8f2fc;
+  --color-pea-purple-100: #eedff7;
+  --color-pea-purple-200: #dec1ef;
+  --color-pea-purple-300: #c694e2;
+  --color-pea-purple-400: #aa62d1;
+  --color-pea-purple-500: #8c3bb8;
+  --color-pea-purple-600: #712a97;
+  --color-pea-purple-700: #5c207e;
+  --color-pea-purple-800: #4e1c6a;
+  --color-pea-purple-900: #421a57;
+  
+  --color-pea-orange: #ff9900;
+  --color-pea-yellow: #fcd116;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: #f9fafb;
+  color: #1f2937;
+}
+
+/* Custom scrollbar for pristine content overflow views */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb {
+  background: #c7d2fe;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #a5b4fc;
+}

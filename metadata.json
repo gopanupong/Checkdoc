@@ -1,0 +1,6 @@
+{
+  "name": "PEA Official Letter Verifier",
+  "description": "ระบบตรวจสอบและแก้ไขหนังสือราชการตามระเบียบสารบรรณ การไฟฟ้าส่วนภูมิภาค (กฟภ.) ด้วยขุมพลัง AI",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

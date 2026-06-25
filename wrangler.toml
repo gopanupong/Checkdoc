@@ -10,4 +10,4 @@ binding = "ASSETS"
 [[d1_databases]]
 binding = "DB"
 database_name = "pea-document-db"
-database_id = "<ffa25784-2ac9-4080-a437-237a08c740ad>"
+database_id = "ffa25784-2ac9-4080-a437-237a08c740ad"

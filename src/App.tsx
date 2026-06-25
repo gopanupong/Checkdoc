@@ -53,7 +53,14 @@ export default function App() {
     setIsLoadingHistory(true);
     try {
       const response = await fetch("/api/documents");
-      const resData = await response.json();
+      let resData;
+      try {
+        const text = await response.text();
+        resData = JSON.parse(text);
+      } catch (jsonErr) {
+        console.error("Failed to parse history JSON:", jsonErr);
+        return;
+      }
       if (resData.success) {
         setDocuments(resData.data);
         // Automatically select the most recent document if none is selected
@@ -163,7 +170,15 @@ export default function App() {
 
       clearInterval(interval);
 
-      const resData = await response.json();
+      let resData;
+      try {
+        const text = await response.text();
+        resData = JSON.parse(text);
+      } catch (jsonErr) {
+        throw new Error(
+          `เกิดข้อผิดพลาดในการอ่านข้อมูลจากเซิร์ฟเวอร์ (HTTP Status ${response.status}): คาดว่าเกิดจากค่าคงที่ GOOGLE_SERVICE_ACCOUNT_JSON หรือ GEMINI_API_KEY ในหน้า Cloudflare ตั้งค่าไว้ไม่ถูกต้องสมบูรณ์ หรือไม่ได้ผูกฐานข้อมูล D1 Database`
+        );
+      }
 
       if (resData.success) {
         // Complete the progress bars

@@ -70,7 +70,16 @@ export default {
         if (!env.GOOGLE_SERVICE_ACCOUNT_JSON) {
           throw new Error("Missing GOOGLE_SERVICE_ACCOUNT_JSON environment variable");
         }
-        const serviceAccount = JSON.parse(env.GOOGLE_SERVICE_ACCOUNT_JSON);
+        let serviceAccount;
+        try {
+          serviceAccount = JSON.parse(env.GOOGLE_SERVICE_ACCOUNT_JSON);
+        } catch (e: any) {
+          throw new Error(
+            "โครงสร้าง GOOGLE_SERVICE_ACCOUNT_JSON ใน Cloudflare Settings ไม่ถูกต้องตามรูปแบบ JSON! " +
+            "(ค่าที่ได้รับขึ้นต้นด้วย: '" + env.GOOGLE_SERVICE_ACCOUNT_JSON.substring(0, 30) + "...') " +
+            "คุณต้องนำไฟล์ JSON ของ Service Account ทั้งก้อน (รวมวงเล็บปีกกา { ... }) ไปวางลงในช่องเก็บความลับ ไม่ใช่เฉพาะ private_key_id หรือส่วนใดส่วนหนึ่ง"
+          );
+        }
 
         // Retrieve OAuth2 Access Token for Google Drive Upload
         const googleAccessToken = await getGoogleAccessToken(serviceAccount);

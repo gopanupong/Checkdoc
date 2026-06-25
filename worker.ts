@@ -78,7 +78,8 @@ export default {
 
         // Parse Service Account
         if (!env.GOOGLE_SERVICE_ACCOUNT_JSON) {
-          throw new Error("Missing GOOGLE_SERVICE_ACCOUNT_JSON environment variable");
+          const envKeys = Object.keys(env || {}).join(", ");
+          throw new Error(`Missing GOOGLE_SERVICE_ACCOUNT_JSON environment variable. (ตัวแปรที่มีอยู่ใน env: [${envKeys || "ไม่มีเลย"}])`);
         }
         if (!env.GEMINI_API_KEY) {
           throw new Error("Missing GEMINI_API_KEY environment variable");

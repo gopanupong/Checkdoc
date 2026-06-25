@@ -1,0 +1,13 @@
+name = "checkdocument"
+main = "worker.ts"
+compatibility_date = "2024-04-01"
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "pea-letter-db"
+database_id = "<ใส่-d1-database-id-ของคุณที่นี่>"

@@ -23,6 +23,9 @@ interface Env {
   DB: D1Database; // Cloudflare D1 Binding
   GEMINI_API_KEY: string;
   GOOGLE_SERVICE_ACCOUNT_JSON: string; // Service Account JSON credentials as a string
+  ASSETS?: {
+    fetch(request: Request): Promise<Response>;
+  };
 }
 
 export default {
@@ -139,6 +142,11 @@ export default {
         return new Response(JSON.stringify({ success: true, data: results }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
+      }
+
+      // 6. Serve static assets if no API routes matched
+      if (env.ASSETS) {
+        return await env.ASSETS.fetch(request);
       }
 
       return new Response(JSON.stringify({ success: false, error: "Not Found" }), {

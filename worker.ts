@@ -188,6 +188,35 @@ export default {
       if (errMsg.includes("no such table")) {
         errMsg = `ไม่พบตารางในฐานข้อมูล D1 (${errMsg}) กรุณาเข้าไปที่ Cloudflare D1 Console แล้วรันคำสั่งสร้างตารางในไฟล์ schema.sql เพื่อเปิดใช้งานฐานข้อมูลให้ถูกต้อง`;
       }
+      
+      // Handle Google Drive quota/permission error elegantly
+      if (errMsg.includes("Service Accounts do not have storage quota") || errMsg.includes("storageQuotaExceeded")) {
+        let clientEmail = "อีเมลของ Service Account ในไฟล์ JSON ของท่าน";
+        try {
+          if (env.GOOGLE_SERVICE_ACCOUNT_JSON) {
+            let sa: any;
+            if (typeof env.GOOGLE_SERVICE_ACCOUNT_JSON === "object") {
+              sa = env.GOOGLE_SERVICE_ACCOUNT_JSON;
+            } else {
+              sa = JSON.parse(env.GOOGLE_SERVICE_ACCOUNT_JSON);
+            }
+            if (sa && sa.client_email) {
+              clientEmail = sa.client_email;
+            }
+          }
+        } catch (e) {}
+
+        const targetFolder = env.GOOGLE_DRIVE_ROOT_FOLDER_ID || "1BYT89M2qsfiOofobM21s7hoS5Nio6wSQ";
+        errMsg = `ไม่สามารถส่งไฟล์ไปยัง Google Drive ได้สำเร็จเนื่องจากปัญหาเรื่องสิทธิ์เข้าถึง:\n\n` +
+                 `Service Account ของท่านไม่มีพื้นที่จัดเก็บส่วนตัว (Storage Quota Exceeded) ซึ่งเป็นพฤติกรรมปกติของ Google Service Account\n\n` +
+                 `💡 วิธีแก้ไขด่วนเพื่อใช้งานได้ทันที:\n` +
+                 `1. คัดลอกอีเมล Service Account นี้: ${clientEmail}\n` +
+                 `2. เปิดหน้าต่าง Google Drive ส่วนตัวของคุณ ไปยังโฟลเดอร์เก็บไฟล์ หรือโฟลเดอร์หลักที่คุณตั้งไว้ในตัวแปร Cloudflare (เช่น โฟลเดอร์ ID: ${targetFolder})\n` +
+                 `3. คลิกปุ่ม "แชร์" (Share) ที่โฟลเดอร์นั้น แล้วนำอีเมลข้างต้นมาใส่เพื่อส่งคำเชิญ\n` +
+                 `4. กำหนดบทบาทสิทธิ์ในการใช้งานให้เป็น "ผู้แก้ไข" (Editor) เสมอ จากนั้นกดบันทึก\n` +
+                 `5. กลับมาที่หน้านี้แล้วลองกดปุ่ม ตรวจพิสูจน์หนังสือราชการด้วย AI ใหม่อีกครั้ง!`;
+      }
+
       return new Response(JSON.stringify({ success: false, error: errMsg }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

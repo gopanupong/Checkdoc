@@ -517,7 +517,10 @@ export default function App() {
                     ระบุ <strong className="text-gray-700">GEMINI_API_KEY</strong> เพื่อเปิดใช้งาน AI ตรวจสอบในระดับแม่นยำสูงสุด
                   </li>
                   <li>
-                    สิทธิ์โฟลเดอร์ปลายทางได้ระบุไว้ในโฟลเดอร์หลัก <a href="https://drive.google.com/drive/folders/1BYT89M2qsfiOofobM21s7hoS5Nio6wSQ" target="_blank" rel="noreferrer" className="text-pea-purple-600 underline">1BYT89M2qsfiOofobM21s7hoS5Nio6wSQ</a> เรียบร้อยแล้ว
+                    ระบุ ID โฟลเดอร์ที่เก็บไฟล์ใน Google Drive ของคุณผ่าน <strong className="text-gray-700">GOOGLE_DRIVE_ROOT_FOLDER_ID</strong>
+                  </li>
+                  <li className="text-red-700 font-semibold bg-red-50 p-2 rounded-lg border border-red-100 mt-1">
+                    ⚠️ สำคัญที่สุด: คุณต้องเปิดหน้าต่าง Google Drive ส่วนตัวของคุณ กด "แชร์" (Share) โฟลเดอร์ที่คุณต้องการใช้ แล้วเชิญอีเมลของ Service Account (ที่อยู่ในไฟล์ JSON) เข้ามาร่วมใช้งาน โดยมอบบทบาทเป็น "ผู้แก้ไข" (Editor) เสมอ ไม่งั้นจะอัปโหลดไม่ผ่านเนื่องจาก Service Account ไม่มีโควตาพื้นที่เก็บส่วนตัว!
                   </li>
                 </ol>
                 <div className="mt-3.5 pt-3.5 border-t border-gray-100 flex items-center justify-between text-gray-400">

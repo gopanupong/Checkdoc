@@ -22,7 +22,8 @@ declare global {
 interface Env {
   DB: D1Database; // Cloudflare D1 Binding
   GEMINI_API_KEY: string;
-  GOOGLE_SERVICE_ACCOUNT_JSON: string; // Service Account JSON credentials as a string
+  GOOGLE_SERVICE_ACCOUNT_JSON: any; // Service Account JSON (string or parsed object if Cloudflare Variable Type is JSON)
+  GOOGLE_DRIVE_ROOT_FOLDER_ID?: string; // Optional custom Google Drive Folder ID
   ASSETS?: {
     fetch(request: Request): Promise<Response>;
   };
@@ -42,10 +43,16 @@ export default {
     }
 
     const url = new URL(request.url);
+    // Robust trailing slash and empty path matching
+    const pathname = url.pathname.replace(/\/$/, "") || "/";
 
     try {
       // Endpoint: GET /api/documents -> Fetch verified history
-      if (url.pathname === "/api/documents" && request.method === "GET") {
+      if (pathname === "/api/documents" && request.method === "GET") {
+        if (!env.DB) {
+          throw new Error("ระบบฐานข้อมูล D1 Database ไม่ได้รับการเชื่อมต่อ (D1 Database Binding is missing) กรุณาตรวจสอบการผูกฐานข้อมูล (D1 Binding) ใน wrangler.toml หรือ Cloudflare Workers Settings");
+        }
+
         const { results: documents } = await env.DB.prepare(
           "SELECT d.*, a.status, a.original_text, a.warning_message, a.recommended_text FROM documents d LEFT JOIN analysis_results a ON d.id = a.document_id ORDER BY d.created_at DESC"
         ).all();
@@ -56,7 +63,7 @@ export default {
       }
 
       // Endpoint: POST /api/upload -> Upload files and analyze
-      if (url.pathname === "/api/upload" && request.method === "POST") {
+      if (pathname === "/api/upload" && request.method === "POST") {
         const formData = await request.formData();
         const files = formData.getAll("files") as File[];
 
@@ -73,15 +80,37 @@ export default {
         if (!env.GOOGLE_SERVICE_ACCOUNT_JSON) {
           throw new Error("Missing GOOGLE_SERVICE_ACCOUNT_JSON environment variable");
         }
-        let serviceAccount;
-        try {
-          serviceAccount = JSON.parse(env.GOOGLE_SERVICE_ACCOUNT_JSON);
-        } catch (e: any) {
+        if (!env.GEMINI_API_KEY) {
+          throw new Error("Missing GEMINI_API_KEY environment variable");
+        }
+
+        let serviceAccount: any;
+        if (typeof env.GOOGLE_SERVICE_ACCOUNT_JSON === "object" && env.GOOGLE_SERVICE_ACCOUNT_JSON !== null) {
+          serviceAccount = env.GOOGLE_SERVICE_ACCOUNT_JSON;
+        } else if (typeof env.GOOGLE_SERVICE_ACCOUNT_JSON === "string") {
+          let saString = env.GOOGLE_SERVICE_ACCOUNT_JSON.trim();
+          if (saString.startsWith('"') && saString.endsWith('"')) {
+            try {
+              saString = JSON.parse(saString);
+            } catch (e) {}
+          }
+          try {
+            serviceAccount = JSON.parse(saString);
+          } catch (e: any) {
+            throw new Error(
+              "โครงสร้าง GOOGLE_SERVICE_ACCOUNT_JSON ใน Cloudflare Settings ไม่ถูกต้องตามรูปแบบ JSON! " +
+              "(ค่าที่ได้รับขึ้นต้นด้วย: '" + saString.substring(0, 30) + "...') " +
+              "คุณต้องนำไฟล์ JSON ของ Service Account ทั้งก้อน (รวมวงเล็บปีกกา { ... }) ไปวางลงในช่องเก็บความลับ"
+            );
+          }
+        } else {
           throw new Error(
-            "โครงสร้าง GOOGLE_SERVICE_ACCOUNT_JSON ใน Cloudflare Settings ไม่ถูกต้องตามรูปแบบ JSON! " +
-            "(ค่าที่ได้รับขึ้นต้นด้วย: '" + env.GOOGLE_SERVICE_ACCOUNT_JSON.substring(0, 30) + "...') " +
-            "คุณต้องนำไฟล์ JSON ของ Service Account ทั้งก้อน (รวมวงเล็บปีกกา { ... }) ไปวางลงในช่องเก็บความลับ ไม่ใช่เฉพาะ private_key_id หรือส่วนใดส่วนหนึ่ง"
+            "GOOGLE_SERVICE_ACCOUNT_JSON ใน Cloudflare Settings มีประเภทข้อมูลที่ไม่ถูกต้อง: " + typeof env.GOOGLE_SERVICE_ACCOUNT_JSON
           );
+        }
+
+        if (!env.DB) {
+          throw new Error("ระบบฐานข้อมูล D1 Database ไม่ได้รับการเชื่อมต่อ (D1 Database Binding is missing) กรุณาตรวจสอบการผูกฐานข้อมูล (D1 Binding) ใน wrangler.toml หรือ Cloudflare Workers Settings");
         }
 
         // Retrieve OAuth2 Access Token for Google Drive Upload
@@ -92,7 +121,7 @@ export default {
           const fileBytes = await file.arrayBuffer();
 
           // 2. Upload file directly to designated Google Drive folder
-          const folderId = "1BYT89M2qsfiOofobM21s7hoS5Nio6wSQ";
+          const folderId = env.GOOGLE_DRIVE_ROOT_FOLDER_ID || "1BYT89M2qsfiOofobM21s7hoS5Nio6wSQ";
           const uploadResult = await uploadToGoogleDrive(
             googleAccessToken,
             file.name,
@@ -154,7 +183,11 @@ export default {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     } catch (err: any) {
-      return new Response(JSON.stringify({ success: false, error: err.message || String(err) }), {
+      let errMsg = err.message || String(err);
+      if (errMsg.includes("no such table")) {
+        errMsg = `ไม่พบตารางในฐานข้อมูล D1 (${errMsg}) กรุณาเข้าไปที่ Cloudflare D1 Console แล้วรันคำสั่งสร้างตารางในไฟล์ schema.sql เพื่อเปิดใช้งานฐานข้อมูลให้ถูกต้อง`;
+      }
+      return new Response(JSON.stringify({ success: false, error: errMsg }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -216,9 +249,12 @@ async function getGoogleAccessToken(sa: any): Promise<string> {
 async function importPrivateKey(pem: string): Promise<CryptoKey> {
   const pemHeader = "-----BEGIN PRIVATE KEY-----";
   const pemFooter = "-----END PRIVATE KEY-----";
-  const pemContents = pem
+  
+  // Handle literal "\n" strings that might result from raw copy-pasting JSON values
+  let pemContents = pem
     .replace(pemHeader, "")
     .replace(pemFooter, "")
+    .replace(/\\n/g, "")
     .replace(/\s+/g, "");
 
   const binaryDerString = atob(pemContents);

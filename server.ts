@@ -67,16 +67,29 @@ async function uploadToGoogleDrive(
   file: Express.Multer.File,
   folderId: string
 ): Promise<string> {
-  const saString = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+  let saString = process.env.GOOGLE_SERVICE_ACCOUNT_JSON?.trim();
   if (!saString) {
     throw new Error("Missing GOOGLE_SERVICE_ACCOUNT_JSON env variable");
   }
 
+  // Handle double-quote wrapping from raw CLI env copy-pastes
+  if (saString.startsWith('"') && saString.endsWith('"')) {
+    try {
+      saString = JSON.parse(saString);
+    } catch (e) {}
+  }
+
   const credentials = JSON.parse(saString);
+
+  // Normalize private key from literal string "\n" to actual LF newline characters
+  let privateKey = credentials.private_key;
+  if (privateKey && typeof privateKey === "string") {
+    privateKey = privateKey.replace(/\\n/g, "\n");
+  }
 
   const auth = new google.auth.JWT({
     email: credentials.client_email,
-    key: credentials.private_key,
+    key: privateKey,
     scopes: ["https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/drive"],
   });
 

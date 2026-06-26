@@ -121,21 +121,28 @@ export default {
           const documentId = crypto.randomUUID();
           const fileBytes = await file.arrayBuffer();
 
-          // 2. Upload file directly to designated Google Drive folder
-          const folderId = env.GOOGLE_DRIVE_ROOT_FOLDER_ID || "1BYT89M2qsfiOofobM21s7hoS5Nio6wSQ";
-          const uploadResult = await uploadToGoogleDrive(
-            googleAccessToken,
-            file.name,
-            file.type,
-            fileBytes,
-            folderId
-          );
+          // 2. Upload file directly to designated Google Drive folder with robust error handling
+          let driveLink = "";
+          try {
+            const folderId = env.GOOGLE_DRIVE_ROOT_FOLDER_ID || "1BYT89M2qsfiOofobM21s7hoS5Nio6wSQ";
+            const uploadResult = await uploadToGoogleDrive(
+              googleAccessToken,
+              file.name,
+              file.type,
+              fileBytes,
+              folderId
+            );
+            driveLink = uploadResult.webViewLink || `https://drive.google.com/open?id=${uploadResult.id}`;
+          } catch (driveErr: any) {
+            console.error("Google Drive Upload Error (Fail-Safe fallback active):", driveErr);
+            driveLink = `FAILED_UPLOAD: ${driveErr.message || String(driveErr)}`;
+          }
 
           // 3. Store document metadata in Cloudflare D1
           await env.DB.prepare(
             "INSERT INTO documents (id, file_name, file_type, google_drive_link) VALUES (?, ?, ?, ?)"
           )
-            .bind(documentId, file.name, file.type, uploadResult.webViewLink || "")
+            .bind(documentId, file.name, file.type, driveLink)
             .run();
 
           // 4. Send document/image data to Gemini 1.5 Pro / 3.1 Pro REST API
@@ -161,7 +168,7 @@ export default {
             id: documentId,
             file_name: file.name,
             file_type: file.type,
-            google_drive_link: uploadResult.webViewLink,
+            google_drive_link: driveLink,
             status,
             original_text: originalText,
             warning_message: aiAnalysis.issues || [],

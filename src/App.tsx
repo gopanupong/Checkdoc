@@ -553,7 +553,7 @@ export default function App() {
                     </div>
 
                     <div className="flex items-center gap-2.5 shrink-0">
-                      {selectedDoc.google_drive_link && (
+                      {selectedDoc.google_drive_link && !selectedDoc.google_drive_link.startsWith("FAILED_UPLOAD:") && (
                         <a
                           href={selectedDoc.google_drive_link}
                           target="_blank"
@@ -578,6 +578,31 @@ export default function App() {
                       )}
                     </div>
                   </div>
+
+                  {/* Warning banner for failed Google Drive upload due to April 2025 Google Service Account quota policy changes */}
+                  {selectedDoc.google_drive_link?.startsWith("FAILED_UPLOAD:") && (
+                    <div className="mx-5 mt-4 p-4 bg-amber-50/80 border border-amber-200 rounded-xl text-xs text-amber-900 flex gap-3 shadow-xs">
+                      <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                      <div className="space-y-1.5">
+                        <h5 className="font-bold text-amber-950 flex items-center gap-1.5">
+                          ⚠️ ตรวจพบข้อผิดพลาดขณะส่งไฟล์ขึ้น Google Drive แต่ระบบยังคงดำเนินการตรวจสอบภาษาด้วย AI สำเร็จตามปกติ!
+                        </h5>
+                        <p className="leading-relaxed">
+                          เนื่องจากนโยบายใหม่ของ Google (เริ่มใช้ เมษายน 2568) **Service Account ใหม่จะมีพื้นที่จัดเก็บเท่ากับ 0 GB (Quota Limit)** ทำให้ไม่สามารถอัปโหลดไฟล์ไปยังไดรฟ์ส่วนบุคคลทั่วไปได้โดยตรง (จะเกิดข้อผิดพลาด Quota Exceeded เสมอ แม้แชร์สิทธิ์เป็นผู้แก้ไขแล้วก็ตาม)
+                        </p>
+                        <div className="bg-white/60 p-2.5 rounded-lg border border-amber-100/70 text-[11px] leading-relaxed mt-1 text-gray-700">
+                          <p className="font-bold text-amber-950 mb-1">💡 ทางเลือกเพื่อเปิดใช้งาน Google Drive:</p>
+                          <ol className="list-decimal pl-4 space-y-1">
+                            <li>หากต้องการบันทึกไฟล์ลง Drive จริงๆ คุณต้องใช้ **Shared Drive (ไดรฟ์แชร์)** ของบัญชีองค์กร Google Workspace จากนั้นแชร์สิทธิ์แบบ "ผู้ส่งเนื้อหา" (Contributor) ให้กับอีเมล Service Account นี้ และกำหนด ID ของโฟลเดอร์ใน Shared Drive นั้น</li>
+                            <li>หรือใช้งานระบบตรวจภาษาแบบเป็นมิตรโดยตรง (ไม่ต้องใช้ Google Drive) เนื่องจากตัวแอปจะตรวจคำผิดด้วยโมเดล Gemini และบันทึกผลลงในฐานข้อมูล D1 ท้องถิ่นอยู่แล้วอย่างสมบูรณ์</li>
+                          </ol>
+                        </div>
+                        <p className="text-[10px] text-amber-700/80 pt-1 font-mono">
+                          ข้อผิดพลาดทางเทคนิค: {selectedDoc.google_drive_link.replace("FAILED_UPLOAD:", "").trim()}
+                        </p>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Split Workspace Editor View */}
                   <div className="grid grid-cols-1 xl:grid-cols-12 divide-y xl:divide-y-0 xl:divide-x divide-gray-100 min-h-[500px]">

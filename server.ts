@@ -265,8 +265,8 @@ app.post("/api/upload", upload.array("files"), async (req: Request, res: Respons
         try {
           driveLink = await uploadToGoogleDrive(file, targetFolderId);
         } catch (driveErr: any) {
-          console.error("Google Drive Upload Error:", driveErr);
-          driveLink = `https://drive.google.com/drive/folders/${targetFolderId}?fallback_link=true`;
+          console.error("Google Drive Upload Error (Local Fallback active):", driveErr);
+          driveLink = `FAILED_UPLOAD: ${driveErr.message || String(driveErr)}`;
         }
       } else {
         // Fallback demo link

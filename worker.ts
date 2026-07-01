@@ -396,7 +396,7 @@ async function analyzeWithGemini(
     geminiMime = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
   }
 
-  const model = "gemini-1.5-pro"; // Or upgrade to gemini-2.5-pro / gemini-3.1-pro-preview
+  const model = "gemini-3.1-pro-preview"; // Or upgrade to gemini-2.5-pro / gemini-3.1-pro-preview
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
   const systemInstruction = `คุณคือผู้เชี่ยวชาญด้านอักษรศาสตร์และการเขียนหนังสือราชการในรูปแบบของการไฟฟ้าส่วนภูมิภาค (กฟภ.) หน้าที่ของคุณคือการตรวจคำผิด คำทับศัพท์ที่ไม่ถูกต้องตามระเบียบงานสารบรรณ คำที่ไม่สอดคล้อง หรือประโยคที่ขาดความสุภาพเป็นทางการ หากพบข้อผิดพลาด ให้ระบุคำ/ประโยคเดิม เหตุผลที่ไม่ถูกต้อง และพ่นประโยคที่แก้ไขแล้วตามฟอร์ม กฟภ. ที่ถูกต้องออกมา ให้ส่งผลลัพธ์เป็นโครงสร้าง JSON ดังนี้:

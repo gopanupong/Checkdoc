@@ -564,7 +564,7 @@ export default function App() {
                     </div>
 
                     <div className="flex items-center gap-2.5 shrink-0">
-                      {selectedDoc.google_drive_link && !selectedDoc.google_drive_link.startsWith("FAILED_UPLOAD:") && (
+                      {selectedDoc.google_drive_link && selectedDoc.google_drive_link.startsWith("http") && (
                         <a
                           href={selectedDoc.google_drive_link}
                           target="_blank"

@@ -76,66 +76,68 @@ export default {
 
         const results = [];
 
-        // Parse Service Account
-        if (!env.GOOGLE_SERVICE_ACCOUNT_JSON) {
-          const envKeys = Object.keys(env || {}).join(", ");
-          throw new Error(`Missing GOOGLE_SERVICE_ACCOUNT_JSON environment variable. (ตัวแปรที่มีอยู่ใน env: [${envKeys || "ไม่มีเลย"}])`);
-        }
+        // Parse Service Account optionally
+        let serviceAccount: any = null;
+        let googleAccessToken: string | null = null;
+
         if (!env.GEMINI_API_KEY) {
           throw new Error("Missing GEMINI_API_KEY environment variable");
         }
 
-        let serviceAccount: any;
-        if (typeof env.GOOGLE_SERVICE_ACCOUNT_JSON === "object" && env.GOOGLE_SERVICE_ACCOUNT_JSON !== null) {
-          serviceAccount = env.GOOGLE_SERVICE_ACCOUNT_JSON;
-        } else if (typeof env.GOOGLE_SERVICE_ACCOUNT_JSON === "string") {
-          let saString = env.GOOGLE_SERVICE_ACCOUNT_JSON.trim();
-          if (saString.startsWith('"') && saString.endsWith('"')) {
+        if (env.GOOGLE_SERVICE_ACCOUNT_JSON) {
+          if (typeof env.GOOGLE_SERVICE_ACCOUNT_JSON === "object" && env.GOOGLE_SERVICE_ACCOUNT_JSON !== null) {
+            serviceAccount = env.GOOGLE_SERVICE_ACCOUNT_JSON;
+          } else if (typeof env.GOOGLE_SERVICE_ACCOUNT_JSON === "string" && env.GOOGLE_SERVICE_ACCOUNT_JSON.trim()) {
+            let saString = env.GOOGLE_SERVICE_ACCOUNT_JSON.trim();
+            if (saString.startsWith('"') && saString.endsWith('"')) {
+              try {
+                saString = JSON.parse(saString);
+              } catch (e) {}
+            }
             try {
-              saString = JSON.parse(saString);
-            } catch (e) {}
+              serviceAccount = JSON.parse(saString);
+            } catch (e: any) {
+              console.warn("Invalid GOOGLE_SERVICE_ACCOUNT_JSON structure:", e.message);
+            }
           }
-          try {
-            serviceAccount = JSON.parse(saString);
-          } catch (e: any) {
-            throw new Error(
-              "โครงสร้าง GOOGLE_SERVICE_ACCOUNT_JSON ใน Cloudflare Settings ไม่ถูกต้องตามรูปแบบ JSON! " +
-              "(ค่าที่ได้รับขึ้นต้นด้วย: '" + saString.substring(0, 30) + "...') " +
-              "คุณต้องนำไฟล์ JSON ของ Service Account ทั้งก้อน (รวมวงเล็บปีกกา { ... }) ไปวางลงในช่องเก็บความลับ"
-            );
-          }
-        } else {
-          throw new Error(
-            "GOOGLE_SERVICE_ACCOUNT_JSON ใน Cloudflare Settings มีประเภทข้อมูลที่ไม่ถูกต้อง: " + typeof env.GOOGLE_SERVICE_ACCOUNT_JSON
-          );
         }
 
         if (!env.DB) {
           throw new Error("ระบบฐานข้อมูล D1 Database ไม่ได้รับการเชื่อมต่อ (D1 Database Binding is missing) กรุณาตรวจสอบการผูกฐานข้อมูล (D1 Binding) ใน wrangler.toml หรือ Cloudflare Workers Settings");
         }
 
-        // Retrieve OAuth2 Access Token for Google Drive Upload
-        const googleAccessToken = await getGoogleAccessToken(serviceAccount);
+        // Retrieve OAuth2 Access Token for Google Drive Upload ONLY if credentials are provided
+        if (serviceAccount) {
+          try {
+            googleAccessToken = await getGoogleAccessToken(serviceAccount);
+          } catch (tokenErr: any) {
+            console.error("Failed to get Google Access Token (will bypass Drive storage):", tokenErr);
+          }
+        }
 
         for (const file of files) {
           const documentId = crypto.randomUUID();
           const fileBytes = await file.arrayBuffer();
 
-          // 2. Upload file directly to designated Google Drive folder with robust error handling
+          // 2. Upload file directly to designated Google Drive folder with robust error handling (if token is available)
           let driveLink = "";
-          try {
-            const folderId = env.GOOGLE_DRIVE_ROOT_FOLDER_ID || "1BYT89M2qsfiOofobM21s7hoS5Nio6wSQ";
-            const uploadResult = await uploadToGoogleDrive(
-              googleAccessToken,
-              file.name,
-              file.type,
-              fileBytes,
-              folderId
-            );
-            driveLink = uploadResult.webViewLink || `https://drive.google.com/open?id=${uploadResult.id}`;
-          } catch (driveErr: any) {
-            console.error("Google Drive Upload Error (Fail-Safe fallback active):", driveErr);
-            driveLink = `FAILED_UPLOAD: ${driveErr.message || String(driveErr)}`;
+          if (googleAccessToken) {
+            try {
+              const folderId = env.GOOGLE_DRIVE_ROOT_FOLDER_ID || "1BYT89M2qsfiOofobM21s7hoS5Nio6wSQ";
+              const uploadResult = await uploadToGoogleDrive(
+                googleAccessToken,
+                file.name,
+                file.type,
+                fileBytes,
+                folderId
+              );
+              driveLink = uploadResult.webViewLink || `https://drive.google.com/open?id=${uploadResult.id}`;
+            } catch (driveErr: any) {
+              console.error("Google Drive Upload Error (Fail-Safe fallback active):", driveErr);
+              driveLink = `FAILED_UPLOAD: ${driveErr.message || String(driveErr)}`;
+            }
+          } else {
+            driveLink = "ไม่ได้จัดเก็บใน Google Drive / ตรวจสอบข้อมูลอย่างเดียว";
           }
 
           // 3. Store document metadata in Cloudflare D1
@@ -465,17 +467,24 @@ async function analyzeWithGemini(
 // Utility encodings
 function base64UrlEncode(str: string): string {
   const binary = new TextEncoder().encode(str);
-  let base64 = btoa(String.fromCharCode(...binary));
-  return base64.replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+  return arrayBufferToBase64Url(binary.buffer);
 }
 
 function arrayBufferToBase64Url(buf: ArrayBuffer): string {
-  const binary = String.fromCharCode(...new Uint8Array(buf));
-  let base64 = btoa(binary);
+  const base64 = arrayBufferToBase64(buf);
   return base64.replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
 }
 
 function arrayBufferToBase64(buf: ArrayBuffer): string {
-  const binary = String.fromCharCode(...new Uint8Array(buf));
+  const bytes = new Uint8Array(buf);
+  let binary = "";
+  const len = bytes.byteLength;
+  const chunkSize = 8192;
+  for (let i = 0; i < len; i += chunkSize) {
+    const sub = bytes.subarray(i, i + chunkSize);
+    // Use apply to parse chunks that are well within the call stack limit
+    // @ts-ignore
+    binary += String.fromCharCode.apply(null, sub);
+  }
   return btoa(binary);
 }

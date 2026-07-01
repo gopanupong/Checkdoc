@@ -247,15 +247,26 @@ export default function App() {
   const renderHighlightedText = (doc: Document) => {
     const issues = getIssues(doc);
     const text = doc.original_text || "";
-    if (issues.length === 0) return <p className="whitespace-pre-wrap leading-relaxed">{text}</p>;
+    if (issues.length === 0) return <p className="whitespace-pre-wrap leading-relaxed text-gray-700 font-serif leading-8">{text}</p>;
 
-    // Sort issues by length descending to match longest phrases first and avoid partial nested replacements
-    const sortedIssues = [...issues].sort((a, b) => b.original_phrase.length - a.original_phrase.length);
+    // Filter unique, non-empty original phrases and sort by length descending to match longest phrases first
+    const uniquePhrases = Array.from(
+      new Set(
+        issues
+          .map(i => i.original_phrase ? i.original_phrase.trim() : "")
+          .filter(phrase => phrase.length > 0)
+      )
+    ).sort((a, b) => b.length - a.length);
 
-    // Build a regular expression to match all issues
-    const escapedPhrases = sortedIssues.map(i =>
-      i.original_phrase.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&")
+    if (uniquePhrases.length === 0) {
+      return <p className="whitespace-pre-wrap leading-relaxed text-gray-700 font-serif leading-8">{text}</p>;
+    }
+
+    // Build a regular expression to match all issues, escaping special regex characters
+    const escapedPhrases = uniquePhrases.map(phrase =>
+      phrase.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&")
     );
+    
     // Create a regex with unique captures
     const regex = new RegExp(`(${escapedPhrases.join("|")})`, "g");
 

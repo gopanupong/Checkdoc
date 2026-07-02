@@ -39,6 +39,9 @@ export default function App() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "pass" | "fail">("all");
 
+  // Selected Gemini model state
+  const [selectedModel, setSelectedModel] = useState<string>("gemini-2.5-flash");
+
   // UX Feedback states
   const [copiedText, setCopiedText] = useState<string | null>(null);
   const [selectedIssueIndex, setSelectedIssueIndex] = useState<number | null>(null);
@@ -149,6 +152,7 @@ export default function App() {
     idleFiles.forEach(f => {
       formData.append("files", f.file);
     });
+    formData.append("model", selectedModel);
 
     try {
       // Simulate progressive upload visually
@@ -333,9 +337,20 @@ export default function App() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3 text-xs">
-            <div className="bg-pea-purple-900/50 border border-pea-purple-400/20 px-3 py-1.5 rounded-full flex items-center gap-2 text-pea-purple-100">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span>Model: <strong className="text-white">Gemini 3.1 Pro (via AI Studio)</strong></span>
+            <div className="bg-pea-purple-900/50 border border-pea-purple-400/20 px-3 py-1 rounded-lg flex items-center gap-2 text-pea-purple-100">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="font-medium whitespace-nowrap text-pea-purple-200">โมเดล:</span>
+              <select
+                value={selectedModel}
+                onChange={(e) => setSelectedModel(e.target.value)}
+                className="bg-transparent border-none text-white font-bold focus:ring-0 focus:outline-hidden cursor-pointer p-0 text-xs text-center outline-hidden [color-scheme:dark]"
+              >
+                <option value="gemini-2.5-flash" className="text-gray-900 bg-white">Gemini 2.5 Flash (แนะนำ / เร็วมาก)</option>
+                <option value="gemini-1.5-flash" className="text-gray-900 bg-white">Gemini 1.5 Flash (โควตาสูง)</option>
+                <option value="gemini-2.5-pro" className="text-gray-900 bg-white">Gemini 2.5 Pro (ละเอียดสูง)</option>
+                <option value="gemini-1.5-pro" className="text-gray-900 bg-white">Gemini 1.5 Pro (มาตรฐาน)</option>
+                <option value="gemini-3.1-pro-preview" className="text-gray-900 bg-white">Gemini 3.1 Pro (โมเดลใหม่)</option>
+              </select>
             </div>
             <div className="bg-pea-purple-900/50 border border-pea-purple-400/20 px-3 py-1.5 rounded-full flex items-center gap-2 text-pea-purple-100">
               <Database className="w-3.5 h-3.5 text-pea-yellow" />
@@ -514,30 +529,22 @@ export default function App() {
               {/* Guide configuration panel */}
               <div className="bg-white rounded-xl shadow-xs border border-gray-100 p-5 text-xs text-gray-600">
                 <h4 className="font-bold text-gray-800 flex items-center gap-1.5 mb-2.5">
-                  <Info className="w-4 h-4 text-pea-orange shrink-0" />
-                  วิธีติดตั้งการเชื่อมต่อ Google Drive & Gemini
+                  <Info className="w-4 h-4 text-pea-purple-600 shrink-0" />
+                  การประมวลผลและการบันทึกข้อมูล
                 </h4>
-                <p className="mb-2 leading-relaxed">
-                  หากคุณเป็นผู้ดูแลระบบและต้องการให้ระบบส่งไฟล์ขึ้น Google Drive ของ กฟภ. และตรวจสอบผ่านโมเดลโดยใช้ API คีย์ของคุณโดยตรง ให้ตั้งค่าตัวแปรใน Cloudflare ดังนี้:
-                </p>
-                <ol className="list-decimal pl-4 space-y-1.5 leading-relaxed text-gray-500">
-                  <li>
-                    อัปโหลดไฟล์ <strong className="text-gray-700">GOOGLE_SERVICE_ACCOUNT_JSON</strong> ผ่านปุ่ม Secrets ในแผงควบคุม AI Studio
-                  </li>
-                  <li>
-                    ระบุ <strong className="text-gray-700">GEMINI_API_KEY</strong> เพื่อเปิดใช้งาน AI ตรวจสอบในระดับแม่นยำสูงสุด
-                  </li>
-                  <li>
-                    ระบุ ID โฟลเดอร์ที่เก็บไฟล์ใน Google Drive ของคุณผ่าน <strong className="text-gray-700">GOOGLE_DRIVE_ROOT_FOLDER_ID</strong>
-                  </li>
-                  <li className="text-red-700 font-semibold bg-red-50 p-2 rounded-lg border border-red-100 mt-1">
-                    ⚠️ สำคัญที่สุด: คุณต้องเปิดหน้าต่าง Google Drive ส่วนตัวของคุณ กด "แชร์" (Share) โฟลเดอร์ที่คุณต้องการใช้ แล้วเชิญอีเมลของ Service Account (ที่อยู่ในไฟล์ JSON) เข้ามาร่วมใช้งาน โดยมอบบทบาทเป็น "ผู้แก้ไข" (Editor) เสมอ ไม่งั้นจะอัปโหลดไม่ผ่านเนื่องจาก Service Account ไม่มีโควตาพื้นที่เก็บส่วนตัว!
-                  </li>
-                </ol>
-                <div className="mt-3.5 pt-3.5 border-t border-gray-100 flex items-center justify-between text-gray-400">
-                  <span>สถานะความเชื่อมโยง:</span>
-                  <span className="bg-pea-purple-50 text-pea-purple-700 px-2.5 py-0.5 rounded-full text-[10px] font-semibold border border-pea-purple-100">
-                    Sandbox Local-Fallback
+                <div className="bg-emerald-50 border border-emerald-100 text-emerald-800 p-3 rounded-lg mb-3">
+                  <p className="font-semibold flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    โหมดตรวจสอบแบบด่วนโดยตรง
+                  </p>
+                  <p className="mt-1 text-xs leading-relaxed text-emerald-700">
+                    เพื่อความรวดเร็วและหลีกเลี่ยงข้อจำกัดโควตาพื้นที่เก็บข้อมูล Google Drive ของผู้ใช้ ระบบจะทำการวิเคราะห์ความถูกต้องเชิงภาษาและระดับอักษรศาสตร์ด้วย AI โดยตรงทันที และบันทึกผลลัพธ์พร้อมประวัติการตรวจลงในระบบฐานข้อมูลคลาวด์ D1 ของ กฟภ. อย่างมั่นคงและปลอดภัย
+                  </p>
+                </div>
+                <div className="flex items-center justify-between text-gray-400 text-[11px] pt-1">
+                  <span>สถานะระบบ:</span>
+                  <span className="bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full text-[10px] font-semibold border border-emerald-100">
+                    วิเคราะห์โดยตรง 100%
                   </span>
                 </div>
               </div>

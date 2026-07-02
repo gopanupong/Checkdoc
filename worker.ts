@@ -76,69 +76,23 @@ export default {
 
         const results = [];
 
-        // Parse Service Account optionally
-        let serviceAccount: any = null;
-        let googleAccessToken: string | null = null;
+        // Retrieve the selected Gemini model from FormData if provided, default to gemini-2.5-flash
+        const modelParam = formData.get("model") as string || "gemini-2.5-flash";
 
         if (!env.GEMINI_API_KEY) {
           throw new Error("Missing GEMINI_API_KEY environment variable");
-        }
-
-        if (env.GOOGLE_SERVICE_ACCOUNT_JSON) {
-          if (typeof env.GOOGLE_SERVICE_ACCOUNT_JSON === "object" && env.GOOGLE_SERVICE_ACCOUNT_JSON !== null) {
-            serviceAccount = env.GOOGLE_SERVICE_ACCOUNT_JSON;
-          } else if (typeof env.GOOGLE_SERVICE_ACCOUNT_JSON === "string" && env.GOOGLE_SERVICE_ACCOUNT_JSON.trim()) {
-            let saString = env.GOOGLE_SERVICE_ACCOUNT_JSON.trim();
-            if (saString.startsWith('"') && saString.endsWith('"')) {
-              try {
-                saString = JSON.parse(saString);
-              } catch (e) {}
-            }
-            try {
-              serviceAccount = JSON.parse(saString);
-            } catch (e: any) {
-              console.warn("Invalid GOOGLE_SERVICE_ACCOUNT_JSON structure:", e.message);
-            }
-          }
         }
 
         if (!env.DB) {
           throw new Error("ระบบฐานข้อมูล D1 Database ไม่ได้รับการเชื่อมต่อ (D1 Database Binding is missing) กรุณาตรวจสอบการผูกฐานข้อมูล (D1 Binding) ใน wrangler.toml หรือ Cloudflare Workers Settings");
         }
 
-        // Retrieve OAuth2 Access Token for Google Drive Upload ONLY if credentials are provided
-        if (serviceAccount) {
-          try {
-            googleAccessToken = await getGoogleAccessToken(serviceAccount);
-          } catch (tokenErr: any) {
-            console.error("Failed to get Google Access Token (will bypass Drive storage):", tokenErr);
-          }
-        }
-
         for (const file of files) {
           const documentId = crypto.randomUUID();
           const fileBytes = await file.arrayBuffer();
 
-          // 2. Upload file directly to designated Google Drive folder with robust error handling (if token is available)
-          let driveLink = "";
-          if (googleAccessToken) {
-            try {
-              const folderId = env.GOOGLE_DRIVE_ROOT_FOLDER_ID || "1BYT89M2qsfiOofobM21s7hoS5Nio6wSQ";
-              const uploadResult = await uploadToGoogleDrive(
-                googleAccessToken,
-                file.name,
-                file.type,
-                fileBytes,
-                folderId
-              );
-              driveLink = uploadResult.webViewLink || `https://drive.google.com/open?id=${uploadResult.id}`;
-            } catch (driveErr: any) {
-              console.error("Google Drive Upload Error (Fail-Safe fallback active):", driveErr);
-              driveLink = `FAILED_UPLOAD: ${driveErr.message || String(driveErr)}`;
-            }
-          } else {
-            driveLink = "ไม่ได้จัดเก็บใน Google Drive / ตรวจสอบข้อมูลอย่างเดียว";
-          }
+          // 2. Google Drive storage is bypassed as requested by the user
+          const driveLink = "ไม่ได้จัดเก็บใน Google Drive / ตรวจสอบข้อมูลอย่างเดียว";
 
           // 3. Store document metadata in Cloudflare D1
           await env.DB.prepare(
@@ -147,9 +101,9 @@ export default {
             .bind(documentId, file.name, file.type, driveLink)
             .run();
 
-          // 4. Send document/image data to Gemini 1.5 Pro / 3.1 Pro REST API
+          // 4. Send document/image data to Gemini REST API
           const base64Data = arrayBufferToBase64(fileBytes);
-          const aiAnalysis = await analyzeWithGemini(env.GEMINI_API_KEY, base64Data, file.type);
+          const aiAnalysis = await analyzeWithGemini(env.GEMINI_API_KEY, base64Data, file.type, modelParam);
 
           // Extract values
           const analysisId = crypto.randomUUID();
@@ -389,7 +343,8 @@ async function uploadToGoogleDrive(
 async function analyzeWithGemini(
   apiKey: string,
   base64Data: string,
-  mimeType: string
+  mimeType: string,
+  modelName: string = "gemini-2.5-flash"
 ): Promise<{ extracted_text: string; recommended_full_text: string; issues: any[] }> {
   // Translate standard mimetypes for Gemini compatibility
   let geminiMime = mimeType;
@@ -398,7 +353,7 @@ async function analyzeWithGemini(
     geminiMime = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
   }
 
-  const model = "gemini-3.1-pro-preview"; // Or upgrade to gemini-2.5-pro / gemini-3.1-pro-preview
+  const model = modelName;
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
   const systemInstruction = `คุณคือผู้เชี่ยวชาญด้านอักษรศาสตร์และการเขียนหนังสือราชการในรูปแบบของการไฟฟ้าส่วนภูมิภาค (กฟภ.) หน้าที่ของคุณคือการตรวจคำผิด คำทับศัพท์ที่ไม่ถูกต้องตามระเบียบงานสารบรรณ คำที่ไม่สอดคล้อง หรือประโยคที่ขาดความสุภาพเป็นทางการ หากพบข้อผิดพลาด ให้ระบุคำ/ประโยคเดิม เหตุผลที่ไม่ถูกต้อง และพ่นประโยคที่แก้ไขแล้วตามฟอร์ม กฟภ. ที่ถูกต้องออกมา ให้ส่งผลลัพธ์เป็นโครงสร้าง JSON ดังนี้:
